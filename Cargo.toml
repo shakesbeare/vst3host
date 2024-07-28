@@ -1,0 +1,13 @@
+[package]
+name = "main"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.86"
+core-foundation = "0.9.4"
+libloading = "0.8.3"
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"
+vst3-sys = { path = "./deps/vst3-sys" }
+winit = "0.30.1"
