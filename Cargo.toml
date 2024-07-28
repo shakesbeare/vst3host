@@ -10,4 +10,5 @@ libloading = "0.8.3"
 tracing = "0.1.40"
 tracing-subscriber = "0.3.18"
 vst3-sys = { path = "./deps/vst3-sys" }
+vst3-com = { path = "./deps/vst3-sys/com" }
 winit = "0.30.1"

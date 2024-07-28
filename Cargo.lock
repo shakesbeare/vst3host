@@ -466,6 +466,7 @@ dependencies = [
  "libloading",
  "tracing",
  "tracing-subscriber",
+ "vst3-com",
  "vst3-sys",
  "winit",
 ]
