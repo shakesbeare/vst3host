@@ -1,11 +1,7 @@
-use std::ffi::CString;
-
 use num_traits::ToPrimitive;
 use vst3_com::{c_void, IID};
 use vst3_sys::{
-    base::{tresult, IUnknown},
-    vst::{IHostApplication, IMessage},
-    VST3,
+    base::{tresult, IUnknown}, vst::IHostApplication, VST3
 };
 
 use crate::TResult;
@@ -26,7 +22,7 @@ impl IHostApplication for PluginHost {
     // TODO: fix this
     unsafe fn create_instance(
         &self,
-        cid: *const IID,
+        _cid: *const IID,
         _iid: *const IID,
         obj: *mut *mut c_void,
     ) -> tresult {

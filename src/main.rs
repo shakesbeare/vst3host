@@ -1,19 +1,11 @@
-
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
 use std::mem::MaybeUninit;
 use main::vst::plugin::VstPlugin;
 use vst3_sys::base::{
-    kResultFalse, kResultTrue, tresult, FIDString, IPluginBase, IPluginFactory,
-    IUnknown, PClassInfo, PFactoryInfo,
+    kResultFalse, kResultTrue, tresult, FIDString, IUnknown,
 };
 use vst3_sys::gui::{IPlugFrame, IPlugView, ViewRect};
-use vst3_sys::sys::GUID;
 use vst3_sys::utils::SharedVstPtr;
-use vst3_sys::vst::{
-    kVstAudioEffectClass, IEditController, IoModes, IID_IEDIT_CONTROLLER,
-};
-use vst3_sys::vst::{IComponent, IID_ICOMPONENT};
-use vst3_sys::VstPtr;
 use vst3_sys::{c_void, VST3};
 use main::vst::module::Module;
 use winit::dpi::{LogicalSize, PhysicalSize};
@@ -89,7 +81,6 @@ fn main() -> anyhow::Result<()> {
     let event_loop = EventLoop::new().unwrap();
     let mut view = View::new()?;
     event_loop.run_app(&mut view)?;
-
     Ok(())
 }
 

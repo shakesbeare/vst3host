@@ -1,5 +1,5 @@
 use anyhow::{bail, Result};
-use num_traits::{FromPrimitive, ToPrimitive};
+use num_traits::ToPrimitive;
 use std::ffi::CString;
 use std::{ffi::CStr, mem::MaybeUninit};
 use thiserror::Error;
