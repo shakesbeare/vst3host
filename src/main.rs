@@ -1,10 +1,7 @@
-use core_foundation::base::TCFType;
-use core_foundation::bundle::CFBundle;
-use core_foundation::string::CFString;
-use core_foundation::url::{kCFURLPOSIXPathStyle, CFURL};
+
 use std::ffi::{CStr, CString};
 use std::mem::MaybeUninit;
-use std::str::FromStr;
+use main::vst::plugin::VstPlugin;
 use vst3_sys::base::{
     kResultFalse, kResultTrue, tresult, FIDString, IPluginBase, IPluginFactory,
     IUnknown, PClassInfo, PFactoryInfo,
@@ -18,20 +15,17 @@ use vst3_sys::vst::{
 use vst3_sys::vst::{IComponent, IID_ICOMPONENT};
 use vst3_sys::VstPtr;
 use vst3_sys::{c_void, VST3};
+use main::vst::module::Module;
 use winit::dpi::{LogicalSize, PhysicalSize};
 use winit::event::WindowEvent;
 use winit::event_loop::EventLoop;
+use anyhow::Result;
 #[allow(deprecated)]
 use winit::raw_window_handle::{
     HasRawWindowHandle, RawWindowHandle,
 };
 
-use libloading::{Library, Symbol};
-
 const VST_PATH: &str = "/Library/Audio/Plug-Ins/VST3/OTT.vst3";
-
-#[cfg(target_os = "macos")]
-const OS_LABEL: &str = "MacOS";
 
 #[allow(dead_code)]
 trait ViewRectExt {
@@ -86,57 +80,6 @@ impl ViewRectExt for ViewRect {
     }
 }
 
-pub struct Module {
-    lib: Library,
-    bundle_ref: *const c_void,
-}
-
-impl Module {
-    pub fn new(path: &str) -> Self {
-        let path_buf = std::path::PathBuf::from(path);
-        let exec_name = path_buf
-            .components()
-            .last()
-            .unwrap()
-            .as_os_str()
-            .to_str()
-            .unwrap()
-            .split_once('.')
-            .unwrap()
-            .0;
-
-        let dylib_path = path_buf.join("Contents").join(OS_LABEL).join(exec_name);
-
-        let lib = unsafe { Library::new(dylib_path).unwrap() };
-        // let bundle_ref = unsafe { CFBundleGetBundleWithIdentifier("com.xfer.OTT.VST3".into()) };
-
-        #[cfg(target_os = "macos")]
-        {
-            let cfstr_path = CFString::from_str(path).unwrap();
-            let cfurl_path =
-                CFURL::from_file_system_path(cfstr_path, kCFURLPOSIXPathStyle, true);
-            let cf_bundle = CFBundle::new(cfurl_path)
-                .expect("Plugin not present")
-                .as_CFTypeRef();
-            Module {
-                lib,
-                bundle_ref: cf_bundle,
-            }
-        }
-    }
-
-    pub fn entry(&self) -> bool {
-        let bundle_entry: Symbol<fn(*const c_void) -> bool> =
-            unsafe { self.lib.get(b"bundleEntry").unwrap() };
-        bundle_entry(self.bundle_ref)
-    }
-
-    pub fn factory(&self) -> VstPtr<dyn IPluginFactory> {
-        let get_plugin_factory: Symbol<fn() -> VstPtr<dyn IPluginFactory>> =
-            unsafe { self.lib.get(b"GetPluginFactory").unwrap() };
-        get_plugin_factory()
-    }
-}
 
 fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
@@ -144,16 +87,7 @@ fn main() -> anyhow::Result<()> {
         .init();
 
     let event_loop = EventLoop::new().unwrap();
-    // let mut view = View {
-    //     window: None,
-    //     plug_view: plugview,
-    //     reference_count: 1,
-    //     __iunknownvptr: todo!(),
-    //     __iplugframevptr: todo!(),
-    //     __refcnt: 1.into(),
-    //
-    // };
-    let mut view = View::new();
+    let mut view = View::new()?;
     event_loop.run_app(&mut view)?;
 
     Ok(())
@@ -162,108 +96,15 @@ fn main() -> anyhow::Result<()> {
 #[VST3(implements(IUnknown, IPlugFrame))]
 struct View {
     window: Option<winit::window::Window>,
-    plug_view: VstPtr<dyn IPlugView>,
+    plugin: VstPlugin,
 }
 
 impl View {
-    pub(crate) fn new() -> Box<View> {
+    pub(crate) fn new() -> Result<Box<View>> {
         let module = Module::new(VST_PATH);
-        if module.entry() {
-            println!("module loaded");
-        }
-        let factory = module.factory();
-        println!("module has {:?} class(es)", unsafe {
-            factory.count_classes()
-        });
+        let plugin = VstPlugin::new(module)?;
 
-        let mut factory_info: MaybeUninit<PFactoryInfo> = MaybeUninit::uninit();
-        unsafe { factory.get_factory_info(factory_info.as_mut_ptr()) };
-        let mut factory_info: PFactoryInfo = unsafe { factory_info.assume_init() };
-
-        let url = unsafe { CStr::from_ptr(factory_info.url.as_mut_ptr()) };
-        let email = unsafe { CStr::from_ptr(factory_info.email.as_mut_ptr()) };
-        let vendor = unsafe { CStr::from_ptr(factory_info.vendor.as_mut_ptr()) };
-
-        println!("{:?}", url);
-        println!("{:?}", email);
-        println!("{:?}", vendor);
-
-        let mut class_info: MaybeUninit<PClassInfo> = MaybeUninit::uninit();
-        unsafe { factory.get_class_info(0, class_info.as_mut_ptr()) };
-        let mut class_info: PClassInfo = unsafe { class_info.assume_init() };
-
-        let category = unsafe { CStr::from_ptr(class_info.category.as_mut_ptr()) };
-        let name = unsafe { CStr::from_ptr(class_info.name.as_mut_ptr()) };
-
-        println!("{:?}", category);
-        println!("{:?}", name);
-
-        // instantiate the classes
-        let mut info: MaybeUninit<PClassInfo> = MaybeUninit::uninit();
-        unsafe { factory.get_class_info(0, info.as_mut_ptr()) };
-        let mut info: PClassInfo = unsafe { info.assume_init() };
-
-        let category = unsafe { CStr::from_ptr(info.category.as_mut_ptr()) };
-        let expected = unsafe { CStr::from_ptr(kVstAudioEffectClass) };
-        if category != expected {
-            panic!("unexpected category on line 212");
-        }
-
-        let mut component: MaybeUninit<VstPtr<dyn IComponent>> = MaybeUninit::uninit();
-        let create_instance_result = unsafe {
-            factory.create_instance(
-                &info.cid as *const GUID,
-                &IID_ICOMPONENT as *const GUID,
-                component.as_mut_ptr() as *mut *mut dyn IComponent as _,
-            )
-        };
-
-        if create_instance_result != vst3_sys::base::kResultTrue {
-            panic!(
-                "Failed to properly create IComponent instance, error code: {}",
-                create_instance_result
-            );
-        }
-
-        // Can now assume that component points to valid memory
-        let component: VstPtr<dyn IComponent> = unsafe { component.assume_init() };
-
-        unsafe { component.set_io_mode(IoModes::kAdvanced as i32) };
-        // TODO: pass the host context IHostApplication
-        unsafe { component.initialize(std::ptr::null_mut()) };
-
-        let mut edit: MaybeUninit<VstPtr<dyn IEditController>> = MaybeUninit::uninit();
-        let create_instance_result = unsafe {
-            factory.create_instance(
-                &info.cid as *const GUID,
-                &IID_IEDIT_CONTROLLER as *const GUID,
-                edit.as_mut_ptr() as *mut *mut dyn IComponent as _,
-            )
-        };
-
-        if create_instance_result != vst3_sys::base::kResultTrue {
-            panic!(
-                "Failed to properly create IEditController instance, error code: {}",
-                create_instance_result
-            );
-        }
-
-        // Can now assume that edit points to valid memory
-        let edit: VstPtr<dyn IEditController> = unsafe { edit.assume_init() };
-
-        // TODO: pass the host context IHostApplication
-        unsafe { edit.initialize(std::ptr::null_mut()) };
-
-        let view_descriptor = CString::new("editor").unwrap();
-        let view_ptr = unsafe { edit.create_view(view_descriptor.as_ptr()) };
-        let plug_view = unsafe {
-            std::mem::transmute::<
-                *mut vst3_sys::c_void,
-                vst3_sys::VstPtr<dyn vst3_sys::gui::IPlugView>,
-            >(view_ptr)
-        };
-
-        return Self::allocate(None, plug_view);
+        Ok(Self::allocate(None, plugin))
     }
 }
 
@@ -300,7 +141,7 @@ impl View {
                 let platform_ui =
                     FIDString::from(CString::new("NSView")?.as_ptr());
                 unsafe {
-                    self.plug_view.attached(ptr, platform_ui);
+                    self.plugin.classes[0].plug_view.attached(ptr, platform_ui);
                 }
             }
             _ => todo!(),
@@ -324,10 +165,8 @@ impl winit::application::ApplicationHandler for View {
         self.window = Some(window);
         self.attach_plug_view().unwrap();
         let mut view_rect: MaybeUninit<ViewRect> = MaybeUninit::uninit();
-        // let mut info: MaybeUninit<PClassInfo> = MaybeUninit::uninit();
-        // unsafe { factory.get_class_info(i, info.as_mut_ptr()) };
         unsafe {
-            self.plug_view.get_size(view_rect.as_mut_ptr());
+            self.plugin.classes[0].plug_view.get_size(view_rect.as_mut_ptr());
         }
         let view_rect = unsafe {
             std::mem::transmute::<
@@ -336,11 +175,11 @@ impl winit::application::ApplicationHandler for View {
             >(view_rect)
         };
         let self_ = unsafe { &mut *(self as *mut Self) } as *mut Self as *mut c_void;
-        if unsafe { self.plug_view.can_resize() } == kResultFalse {
+        if unsafe { self.plugin.classes[0].plug_view.can_resize() } == kResultFalse {
             self.window.as_ref().unwrap().set_resizable(false);
         }
         unsafe {
-            self.plug_view.set_frame(self_);
+            self.plugin.classes[0].plug_view.set_frame(self_);
         }
         let _ = self
             .window
@@ -369,7 +208,7 @@ impl winit::application::ApplicationHandler for View {
             WindowEvent::RedrawRequested => {}
             WindowEvent::CloseRequested => {
                 unsafe {
-                    self.plug_view.removed();
+                    self.plugin.classes[0].plug_view.removed();
                 }
                 std::process::exit(0);
             }
