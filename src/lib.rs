@@ -1,4 +1,4 @@
-pub mod vst; 
+pub mod vst;
 
 #[macro_use]
 extern crate num_derive;

@@ -1,21 +1,14 @@
+use anyhow::Result;
+use main::vst::module::Module;
+use main::vst::plugin::VstPlugin;
 use std::ffi::CString;
 use std::mem::MaybeUninit;
-use main::vst::plugin::VstPlugin;
-use vst3_sys::base::{
-    kResultFalse, kResultTrue, tresult, FIDString, IUnknown,
-};
-use vst3_sys::gui::{IPlugFrame, IPlugView, ViewRect};
-use vst3_sys::utils::SharedVstPtr;
-use vst3_sys::{c_void, VST3};
-use main::vst::module::Module;
+use vst3::Steinberg::{kResultFalse, FIDString, IPlugViewTrait, ViewRect};
 use winit::dpi::{LogicalSize, PhysicalSize};
 use winit::event::WindowEvent;
 use winit::event_loop::EventLoop;
-use anyhow::Result;
 #[allow(deprecated)]
-use winit::raw_window_handle::{
-    HasRawWindowHandle, RawWindowHandle,
-};
+use winit::raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
 
 const VST_PATH: &str = "/Library/Audio/Plug-Ins/VST3/OTT.vst3";
 
@@ -63,15 +56,17 @@ impl ViewRectExt for ViewRect {
     }
 
     fn eq(&self, other: &ViewRect) -> bool {
-        matches!((
-            self.right == other.right,
-            self.bottom == other.bottom,
-            self.top == other.top,
-            self.left == other.left,
-        ), (true, true, true, true))
+        matches!(
+            (
+                self.right == other.right,
+                self.bottom == other.bottom,
+                self.top == other.top,
+                self.left == other.left,
+            ),
+            (true, true, true, true)
+        )
     }
 }
-
 
 fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
@@ -84,33 +79,20 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[VST3(implements(IUnknown, IPlugFrame))]
 struct View {
     window: Option<winit::window::Window>,
     plugin: VstPlugin,
 }
 
 impl View {
-    pub(crate) fn new() -> Result<Box<View>> {
+    pub(crate) fn new() -> Result<View> {
         let module = Module::new(VST_PATH);
         let plugin = VstPlugin::new(module)?;
 
-        Ok(Self::allocate(None, plugin))
-    }
-}
-
-impl IPlugFrame for View {
-    unsafe fn resize_view(
-        &self,
-        _view: SharedVstPtr<dyn IPlugView>,
-        new_size: *mut ViewRect,
-    ) -> tresult {
-        let new_size = PhysicalSize::<u32> {
-            width: (*new_size).right as u32,
-            height: (*new_size).bottom as u32,
-        };
-        let _ = self.window.as_ref().unwrap().request_inner_size(new_size);
-        kResultTrue
+        Ok(Self {
+            window: None,
+            plugin,
+        })
     }
 }
 
@@ -129,10 +111,11 @@ impl View {
         match self.raw_handle().unwrap() {
             RawWindowHandle::AppKit(ptr) => {
                 let ptr = ptr.ns_view.as_ptr();
-                let platform_ui =
-                    FIDString::from(CString::new("NSView")?.as_ptr());
+                let platform_ui = FIDString::from(c"NSView".as_ptr());
                 unsafe {
-                    self.plugin.classes[0].plug_view.attached(ptr, platform_ui);
+                    let plug_view = self.plugin.classes[0].plug_view.as_com_ref();
+                    dbg!(plug_view.isPlatformTypeSupported(c"NSView".as_ptr()));
+                    plug_view.attached(ptr, platform_ui);
                 }
             }
             _ => todo!(),
@@ -157,20 +140,18 @@ impl winit::application::ApplicationHandler for View {
         self.attach_plug_view().unwrap();
         let mut view_rect: MaybeUninit<ViewRect> = MaybeUninit::uninit();
         unsafe {
-            self.plugin.classes[0].plug_view.get_size(view_rect.as_mut_ptr());
+            let plug_view = self.plugin.classes[0].plug_view.as_com_ref();
+            plug_view.getSize(view_rect.as_mut_ptr());
         }
         let view_rect = unsafe {
-            std::mem::transmute::<
-                std::mem::MaybeUninit<vst3_sys::gui::ViewRect>,
-                vst3_sys::gui::ViewRect,
-            >(view_rect)
+            std::mem::transmute::<std::mem::MaybeUninit<ViewRect>, ViewRect>(view_rect)
         };
-        let self_ = unsafe { &mut *(self as *mut Self) } as *mut Self as *mut c_void;
-        if unsafe { self.plugin.classes[0].plug_view.can_resize() } == kResultFalse {
+        if unsafe {
+            let plug_view = self.plugin.classes[0].plug_view.as_com_ref();
+            plug_view.canResize()
+        } == kResultFalse
+        {
             self.window.as_ref().unwrap().set_resizable(false);
-        }
-        unsafe {
-            self.plugin.classes[0].plug_view.set_frame(self_);
         }
         let _ = self
             .window
@@ -199,7 +180,8 @@ impl winit::application::ApplicationHandler for View {
             WindowEvent::RedrawRequested => {}
             WindowEvent::CloseRequested => {
                 unsafe {
-                    self.plugin.classes[0].plug_view.removed();
+                    let plug_view = self.plugin.classes[0].plug_view.as_com_ref();
+                    plug_view.removed();
                 }
                 std::process::exit(0);
             }

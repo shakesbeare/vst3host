@@ -1,39 +1,30 @@
 use num_traits::ToPrimitive;
-use vst3_com::{c_void, IID};
-use vst3_sys::{
-    base::{tresult, IUnknown}, vst::IHostApplication, VST3
-};
+use vst3::Steinberg::{char16, tresult, Vst::*, TUID};
 
 use crate::TResult;
 
-#[VST3(implements(IUnknown))]
 pub struct PluginHost {}
 
-impl IHostApplication for PluginHost {
-    unsafe fn get_name(&self, name: *mut u16) -> tresult {
+impl IHostApplicationTrait for PluginHost {
+    unsafe fn getName(&self, name: *mut String128) -> tresult {
         *name = String::from("Host Application")
-            .encode_utf16()
-            .by_ref()
-            .next()
-            .unwrap();
+            .chars()
+            .map(|c| c as char16)
+            .collect::<Vec<char16>>()
+            .try_into()
+            .expect("name should always be less than 128 chars");
         TResult::KResultOk.to_i32().unwrap()
     }
 
     // TODO: fix this
-    unsafe fn create_instance(
+    unsafe fn createInstance(
         &self,
-        _cid: *const IID,
-        _iid: *const IID,
-        obj: *mut *mut c_void,
+        _cid: *mut TUID,
+        _iid: *mut TUID,
+        obj: *mut *mut ::std::ffi::c_void,
     ) -> tresult {
         *obj = std::ptr::null_mut();
         TResult::KResultFalse.to_i32().unwrap()
-    }
-}
-
-impl PluginHost {
-    pub fn new() -> Box<Self> {
-        Self::allocate()
     }
 }
 

@@ -1,15 +1,17 @@
 use anyhow::{bail, Result};
 use num_traits::ToPrimitive;
-use std::ffi::CString;
+use vst3::Steinberg::Vst::ViewType::kEditor;
+use std::ffi::{c_void, CString};
 use std::{ffi::CStr, mem::MaybeUninit};
 use thiserror::Error;
-use vst3_com::sys::GUID;
-use vst3_com::VstPtr;
-use vst3_sys::base::{IPluginBase, IPluginFactory, PClassInfo, PFactoryInfo};
-use vst3_sys::gui::IPlugView;
-use vst3_sys::vst::{
-    IComponent, IEditController, IoModes, IID_ICOMPONENT, IID_IEDIT_CONTROLLER,
+use vst3::Steinberg::Vst::{
+    IComponent, IComponentTrait, IEditController, IEditControllerTrait, IoModes_,
 };
+use vst3::Steinberg::{
+    kResultTrue, IPlugView, IPluginBaseTrait, IPluginFactory, IPluginFactoryTrait,
+    PClassInfo, PFactoryInfo,
+};
+use vst3::{ComPtr, Interface};
 
 use crate::TResult;
 
@@ -21,6 +23,7 @@ pub struct VstPlugin {
     pub classes: Vec<PluginClass>,
 }
 
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct PluginMetadata {
     pub url: String,
     pub email: String,
@@ -29,11 +32,12 @@ pub struct PluginMetadata {
 
 pub struct PluginClass {
     pub metadata: ClassMetadata,
-    pub component: VstPtr<dyn IComponent>,
-    pub edit_controller: VstPtr<dyn IEditController>,
-    pub plug_view: VstPtr<dyn IPlugView>,
+    pub component: ComPtr<IComponent>,
+    pub edit_controller: ComPtr<IEditController>,
+    pub plug_view: ComPtr<IPlugView>,
 }
 
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct ClassMetadata {
     pub name: String,
     pub category: ClassCategory,
@@ -46,24 +50,25 @@ impl VstPlugin {
         }
 
         let mut factory = module.factory();
-        let num_classes = unsafe { factory.count_classes() };
+        let num_classes = unsafe { module.factory().countClasses() };
 
         let mut factory_info: MaybeUninit<PFactoryInfo> = MaybeUninit::uninit();
-        unsafe { factory.get_factory_info(factory_info.as_mut_ptr()) };
-        let mut factory_info: PFactoryInfo = unsafe { factory_info.assume_init() };
+        unsafe {
+            factory.getFactoryInfo(factory_info.as_mut_ptr());
+        };
+        let factory_info: PFactoryInfo = unsafe { factory_info.assume_init() };
 
-        let url = unsafe { CStr::from_ptr(factory_info.url.as_mut_ptr()) }
+        let url = unsafe { CStr::from_ptr(factory_info.url.as_ptr()) }
             .to_str()?
             .to_string();
-        let email = unsafe { CStr::from_ptr(factory_info.email.as_mut_ptr()) }
+        let email = unsafe { CStr::from_ptr(factory_info.email.as_ptr()) }
             .to_str()?
             .to_string();
-        let vendor = unsafe { CStr::from_ptr(factory_info.vendor.as_mut_ptr()) }
+        let vendor = unsafe { CStr::from_ptr(factory_info.vendor.as_ptr()) }
             .to_str()?
             .to_string();
 
         let metadata = PluginMetadata { url, email, vendor };
-
         let mut classes = vec![];
         for i in 0..num_classes {
             classes.push(PluginClass::new(&mut factory, i)?);
@@ -75,11 +80,11 @@ impl VstPlugin {
 
 impl PluginClass {
     pub fn new(
-        factory: &mut VstPtr<dyn IPluginFactory>,
+        factory: &mut ComPtr<IPluginFactory>,
         class_idx: i32,
     ) -> Result<PluginClass> {
         let mut class_info: MaybeUninit<PClassInfo> = MaybeUninit::uninit();
-        unsafe { factory.get_class_info(class_idx, class_info.as_mut_ptr()) };
+        unsafe { factory.getClassInfo(class_idx, class_info.as_mut_ptr()) };
         let mut class_info: PClassInfo = unsafe { class_info.assume_init() };
 
         let category: ClassCategory = class_info.category.as_ptr().into();
@@ -87,12 +92,12 @@ impl PluginClass {
             .to_str()?
             .to_string();
 
-        let mut component: MaybeUninit<VstPtr<dyn IComponent>> = MaybeUninit::uninit();
+        let mut component: MaybeUninit<*mut IComponent> = MaybeUninit::uninit();
         let create_instance_result = unsafe {
-            factory.create_instance(
-                &class_info.cid as *const GUID,
-                &IID_ICOMPONENT as *const GUID,
-                component.as_mut_ptr() as *mut *mut dyn IComponent as _,
+            factory.createInstance(
+                class_info.cid.as_ptr(),
+                IComponent::IID.as_ptr() as *const i8,
+                component.as_mut_ptr() as *mut *mut c_void,
             )
         };
 
@@ -107,21 +112,24 @@ impl PluginClass {
             ));
         }
 
-        let component: VstPtr<dyn IComponent> = unsafe { component.assume_init() };
-        unsafe { component.set_io_mode(IoModes::kAdvanced as i32) };
+
+        let component_ptr: *mut IComponent = unsafe { component.assume_init() };
+        let component = unsafe { ComPtr::from_raw(component_ptr).unwrap() };
+        unsafe { component.setIoMode(IoModes_::kAdvanced as i32) };
+
         // TODO: pass the host context IHostApplication
         unsafe { component.initialize(std::ptr::null_mut()) };
 
-        let mut edit: MaybeUninit<VstPtr<dyn IEditController>> = MaybeUninit::uninit();
+        let mut edit: MaybeUninit<*mut IEditController> = MaybeUninit::uninit();
         let create_instance_result = unsafe {
-            factory.create_instance(
-                &class_info.cid as *const GUID,
-                &IID_IEDIT_CONTROLLER as *const GUID,
-                edit.as_mut_ptr() as *mut *mut dyn IComponent as _,
+            factory.createInstance(
+                class_info.cid.as_ptr(),
+                IEditController::IID.as_ptr() as *const i8,
+                edit.as_mut_ptr() as *mut *mut c_void,
             )
         };
 
-        if create_instance_result != vst3_sys::base::kResultTrue {
+        if create_instance_result != kResultTrue {
             panic!(
                 "Failed to properly create IEditController instance, error code: {}",
                 create_instance_result
@@ -129,20 +137,14 @@ impl PluginClass {
         }
 
         // Can now assume that edit points to valid memory
-        let edit_controller: VstPtr<dyn IEditController> =
-            unsafe { edit.assume_init() };
+        let edit_ptr: *mut IEditController = unsafe { edit.assume_init() };
+        let edit_controller = unsafe { ComPtr::from_raw(edit_ptr).unwrap() };
 
-        // TODO: pass the host context IHostApplication
+        // // TODO: pass the host context IHostApplication
         unsafe { edit_controller.initialize(std::ptr::null_mut()) };
 
-        let view_descriptor = CString::new("editor").unwrap();
-        let view_ptr = unsafe { edit_controller.create_view(view_descriptor.as_ptr()) };
-        let plug_view = unsafe {
-            std::mem::transmute::<
-                *mut vst3_sys::c_void,
-                vst3_sys::VstPtr<dyn vst3_sys::gui::IPlugView>,
-            >(view_ptr)
-        };
+        let view_ptr = unsafe { edit_controller.createView(kEditor) };
+        let plug_view = unsafe { ComPtr::from_raw(view_ptr).unwrap() };
 
         Ok(PluginClass {
             metadata: ClassMetadata { name, category },

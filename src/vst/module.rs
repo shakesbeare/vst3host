@@ -1,16 +1,18 @@
-
-use std::str::FromStr;
+use std::{ffi::c_void, str::FromStr};
 
 use libloading::{Library, Symbol};
-use vst3_com::{c_void, VstPtr};
 
 #[cfg(target_os = "macos")]
-use core_foundation::{base::TCFType, bundle::CFBundle, string::CFString, url::{kCFURLPOSIXPathStyle, CFURL}};
-use vst3_sys::base::IPluginFactory;
+use core_foundation::{
+    base::TCFType,
+    bundle::CFBundle,
+    string::CFString,
+    url::{kCFURLPOSIXPathStyle, CFURL},
+};
+use vst3::{ComPtr, Steinberg::IPluginFactory};
 
 #[cfg(target_os = "macos")]
 const OS_LABEL: &str = "MacOS";
-
 
 pub struct Module {
     lib: Library,
@@ -57,9 +59,9 @@ impl Module {
         bundle_entry(self.bundle_ref)
     }
 
-    pub fn factory(&self) -> VstPtr<dyn IPluginFactory> {
-        let get_plugin_factory: Symbol<fn() -> VstPtr<dyn IPluginFactory>> =
+    pub fn factory(&self) -> ComPtr<IPluginFactory> {
+        let get_plugin_factory: Symbol<fn() -> *mut IPluginFactory> =
             unsafe { self.lib.get(b"GetPluginFactory").unwrap() };
-        get_plugin_factory()
+        unsafe { ComPtr::from_raw(get_plugin_factory()).unwrap() }
     }
 }
