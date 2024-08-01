@@ -1,24 +1,26 @@
 use anyhow::{bail, Result};
 use num_traits::ToPrimitive;
-use vst3::Steinberg::Vst::ViewType::kEditor;
-use std::ffi::{c_void, CString};
+use std::ffi::c_void;
 use std::{ffi::CStr, mem::MaybeUninit};
 use thiserror::Error;
+use vst3::Steinberg::Vst::ViewType::kEditor;
 use vst3::Steinberg::Vst::{
     IComponent, IComponentTrait, IEditController, IEditControllerTrait, IoModes_,
 };
 use vst3::Steinberg::{
-    kResultTrue, IPlugView, IPluginBaseTrait, IPluginFactory, IPluginFactoryTrait,
-    PClassInfo, PFactoryInfo,
+    kResultTrue, IPlugView, IPlugViewTrait, IPluginBaseTrait, IPluginFactory,
+    IPluginFactoryTrait, PClassInfo, PFactoryInfo,
 };
 use vst3::{ComPtr, Interface};
 
 use crate::TResult;
 
-use super::module;
+use super::module::{self, Module};
 use super::ClassCategory;
 
 pub struct VstPlugin {
+    pub module: Module,
+    pub factory: ComPtr<IPluginFactory>,
     pub metadata: PluginMetadata,
     pub classes: Vec<PluginClass>,
 }
@@ -74,7 +76,12 @@ impl VstPlugin {
             classes.push(PluginClass::new(&mut factory, i)?);
         }
 
-        Ok(VstPlugin { metadata, classes })
+        Ok(VstPlugin {
+            module,
+            factory,
+            metadata,
+            classes,
+        })
     }
 }
 
@@ -112,7 +119,6 @@ impl PluginClass {
             ));
         }
 
-
         let component_ptr: *mut IComponent = unsafe { component.assume_init() };
         let component = unsafe { ComPtr::from_raw(component_ptr).unwrap() };
         unsafe { component.setIoMode(IoModes_::kAdvanced as i32) };
@@ -144,7 +150,11 @@ impl PluginClass {
         unsafe { edit_controller.initialize(std::ptr::null_mut()) };
 
         let view_ptr = unsafe { edit_controller.createView(kEditor) };
-        let plug_view = unsafe { ComPtr::from_raw(view_ptr).unwrap() };
+        let plug_view = unsafe {
+            std::mem::transmute::<*mut IPlugView, ComPtr<IPlugView>>(view_ptr)
+        };
+
+        unsafe { dbg!(plug_view.isPlatformTypeSupported(c"NSView".as_ptr())) };
 
         Ok(PluginClass {
             metadata: ClassMetadata { name, category },

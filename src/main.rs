@@ -94,9 +94,7 @@ impl View {
             plugin,
         })
     }
-}
 
-impl View {
     #[allow(deprecated)]
     fn raw_handle(&self) -> Option<RawWindowHandle> {
         if let Some(win) = &self.window {
@@ -114,7 +112,6 @@ impl View {
                 let platform_ui = FIDString::from(c"NSView".as_ptr());
                 unsafe {
                     let plug_view = self.plugin.classes[0].plug_view.as_com_ref();
-                    dbg!(plug_view.isPlatformTypeSupported(c"NSView".as_ptr()));
                     plug_view.attached(ptr, platform_ui);
                 }
             }
