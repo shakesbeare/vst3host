@@ -1,28 +1,29 @@
 use anyhow::{bail, Result};
 use num_traits::ToPrimitive;
 use std::ffi::c_void;
+use std::sync::Arc;
 use std::{ffi::CStr, mem::MaybeUninit};
 use thiserror::Error;
 use vst3::Steinberg::Vst::ViewType::kEditor;
 use vst3::Steinberg::Vst::{
-    IComponent, IComponentTrait, IEditController, IEditControllerTrait, IoModes_,
+    IComponent, IComponentTrait, IEditController, IEditControllerTrait,
+    IHostApplication, IoModes_,
 };
 use vst3::Steinberg::{
-    kResultTrue, IPlugView, IPlugViewTrait, IPluginBaseTrait, IPluginFactory,
+    kResultTrue, FUnknown, IPlugView, IPluginBaseTrait, IPluginFactory,
     IPluginFactoryTrait, PClassInfo, PFactoryInfo,
 };
-use vst3::{ComPtr, Interface};
+use vst3::{ComPtr, ComRef, Interface};
 
 use crate::TResult;
 
 use super::module::{self, Module};
-use super::ClassCategory;
+use super::{host, ClassCategory, IntoVstPtr, VstPtr};
 
-pub struct VstPlugin {
-    pub module: Module,
-    pub factory: ComPtr<IPluginFactory>,
+pub struct VstPlugin<'a> {
+    pub factory: VstPtr<'a, IPluginFactory>,
     pub metadata: PluginMetadata,
-    pub classes: Vec<PluginClass>,
+    pub classes: Vec<PluginClass<'a>>,
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
@@ -32,11 +33,11 @@ pub struct PluginMetadata {
     pub vendor: String,
 }
 
-pub struct PluginClass {
+pub struct PluginClass<'a> {
     pub metadata: ClassMetadata,
-    pub component: ComPtr<IComponent>,
-    pub edit_controller: ComPtr<IEditController>,
-    pub plug_view: ComPtr<IPlugView>,
+    pub component: VstPtr<'a, IComponent>,
+    pub edit_controller: VstPtr<'a, IEditController>,
+    pub plug_view: VstPtr<'a, IPlugView>,
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
@@ -45,13 +46,16 @@ pub struct ClassMetadata {
     pub category: ClassCategory,
 }
 
-impl VstPlugin {
-    pub fn new(module: module::Module) -> Result<Self> {
+impl<'a> VstPlugin<'a> {
+    pub fn new(
+        module: &'a module::Module,
+        host: &mut host::PluginHost,
+    ) -> Result<Self> {
         if !module.entry() {
             bail!(PluginError::EntryFailed);
         }
 
-        let mut factory = module.factory();
+        let mut factory = module.factory().into_vstptr(module);
         let num_classes = unsafe { module.factory().countClasses() };
 
         let mut factory_info: MaybeUninit<PFactoryInfo> = MaybeUninit::uninit();
@@ -73,11 +77,10 @@ impl VstPlugin {
         let metadata = PluginMetadata { url, email, vendor };
         let mut classes = vec![];
         for i in 0..num_classes {
-            classes.push(PluginClass::new(&mut factory, i)?);
+            classes.push(PluginClass::new(&mut factory, i, host, module)?);
         }
 
         Ok(VstPlugin {
-            module,
             factory,
             metadata,
             classes,
@@ -85,11 +88,13 @@ impl VstPlugin {
     }
 }
 
-impl PluginClass {
+impl<'a> PluginClass<'a> {
     pub fn new(
-        factory: &mut ComPtr<IPluginFactory>,
+        factory: &mut VstPtr<IPluginFactory>,
         class_idx: i32,
-    ) -> Result<PluginClass> {
+        host: &mut host::PluginHost,
+        module: &'a Module,
+    ) -> Result<PluginClass<'a>> {
         let mut class_info: MaybeUninit<PClassInfo> = MaybeUninit::uninit();
         unsafe { factory.getClassInfo(class_idx, class_info.as_mut_ptr()) };
         let mut class_info: PClassInfo = unsafe { class_info.assume_init() };
@@ -120,10 +125,12 @@ impl PluginClass {
         }
 
         let component_ptr: *mut IComponent = unsafe { component.assume_init() };
-        let component = unsafe { ComPtr::from_raw(component_ptr).unwrap() };
+        let component =
+            unsafe { ComPtr::from_raw(component_ptr).unwrap() }.into_vstptr(&module);
         unsafe { component.setIoMode(IoModes_::kAdvanced as i32) };
 
-        // TODO: pass the host context IHostApplication
+        // let hostptr = unsafe { ComRef::from_raw(host as *mut host::PluginHost as *mut FUnknown).unwrap() };
+        // unsafe { component.initialize(hostptr.as_ptr()) };
         unsafe { component.initialize(std::ptr::null_mut()) };
 
         let mut edit: MaybeUninit<*mut IEditController> = MaybeUninit::uninit();
@@ -144,17 +151,17 @@ impl PluginClass {
 
         // Can now assume that edit points to valid memory
         let edit_ptr: *mut IEditController = unsafe { edit.assume_init() };
-        let edit_controller = unsafe { ComPtr::from_raw(edit_ptr).unwrap() };
+        let edit_controller =
+            unsafe { ComPtr::from_raw(edit_ptr).unwrap() }.into_vstptr(module);
 
-        // // TODO: pass the host context IHostApplication
-        unsafe { edit_controller.initialize(std::ptr::null_mut()) };
+        // unsafe { component.initialize(host as *mut  host::PluginHost as *mut FUnknown) };
+        unsafe { component.initialize(std::ptr::null_mut()) };
 
         let view_ptr = unsafe { edit_controller.createView(kEditor) };
         let plug_view = unsafe {
             std::mem::transmute::<*mut IPlugView, ComPtr<IPlugView>>(view_ptr)
-        };
-
-        unsafe { dbg!(plug_view.isPlatformTypeSupported(c"NSView".as_ptr())) };
+        }
+        .into_vstptr(module);
 
         Ok(PluginClass {
             metadata: ClassMetadata { name, category },

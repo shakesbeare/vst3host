@@ -1,9 +1,18 @@
 use anyhow::Result;
+use main::vst::host::PluginHost;
 use main::vst::module::Module;
 use main::vst::plugin::VstPlugin;
-use std::ffi::CString;
+use std::borrow::Borrow;
 use std::mem::MaybeUninit;
-use vst3::Steinberg::{kResultFalse, FIDString, IPlugViewTrait, ViewRect};
+use std::path::PathBuf;
+use std::pin::{self, Pin};
+use std::rc::Rc;
+use std::sync::Arc;
+use vst3::Steinberg::{
+    kResultFalse, kResultOk, tresult, FIDString, IPlugFrame, IPlugFrameTrait,
+    IPlugView, IPlugViewTrait, ViewRect,
+};
+use vst3::{Class, ComPtr, ComRef, ComWrapper};
 use winit::dpi::{LogicalSize, PhysicalSize};
 use winit::event::WindowEvent;
 use winit::event_loop::EventLoop;
@@ -12,13 +21,11 @@ use winit::raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
 
 const VST_PATH: &str = "/Library/Audio/Plug-Ins/VST3/OTT.vst3";
 
-#[allow(dead_code)]
 trait ViewRectExt {
     fn to_logical_size(self) -> winit::dpi::LogicalSize<f32>;
     fn eq(&self, other: &ViewRect) -> bool;
 }
 
-#[allow(dead_code)]
 trait ToViewRectExt {
     fn to_view_rect(self) -> ViewRect;
 }
@@ -73,25 +80,56 @@ fn main() -> anyhow::Result<()> {
         .with_max_level(tracing::Level::WARN)
         .init();
 
+    let module = Module::new(VST_PATH);
     let event_loop = EventLoop::new().unwrap();
-    let mut view = View::new()?;
+    let mut view = View::new(VST_PATH)?;
     event_loop.run_app(&mut view)?;
     Ok(())
 }
 
-struct View {
+struct View<'a> {
     window: Option<winit::window::Window>,
-    plugin: VstPlugin,
+    plugin: VstPlugin<'a>,
+    host: PluginHost,
 }
 
-impl View {
-    pub(crate) fn new() -> Result<View> {
-        let module = Module::new(VST_PATH);
-        let plugin = VstPlugin::new(module)?;
+impl<'a> Class for View<'a> {
+    type Interfaces = (IPlugFrame,);
+}
+
+#[allow(non_snake_case)]
+impl<'a> IPlugFrameTrait for View<'a> {
+    unsafe fn resizeView(
+        &self,
+        view: *mut IPlugView,
+        newSize: *mut ViewRect,
+    ) -> tresult {
+        let Some(ref window) = self.window else {
+            return kResultFalse;
+        };
+        let new_size =
+            unsafe { PhysicalSize::new((*newSize).right, (*newSize).bottom) };
+        window.request_inner_size(new_size).unwrap();
+        kResultOk
+    }
+}
+
+impl<'a> View<'a> {
+    pub(crate) fn new(path: &str) -> Result<View<'a>> {
+        let module = Box::pin(Module::new(path));
+        let mut host = PluginHost {};
+        // Safety:
+        //     The pin guarantees that the module does not move 
+        //     and the reference remains valid
+        // Module is dropped at the end of the scope... why does
+        // this work???
+        let plugin =
+            VstPlugin::new(unsafe { &*(&*module as *const Module) }, &mut host)?;
 
         Ok(Self {
             window: None,
             plugin,
+            host,
         })
     }
 
@@ -122,7 +160,7 @@ impl View {
     }
 }
 
-impl winit::application::ApplicationHandler for View {
+impl<'a> winit::application::ApplicationHandler for View<'a> {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
         let attributes = winit::window::Window::default_attributes().with_inner_size(
             winit::dpi::LogicalSize {
@@ -137,8 +175,10 @@ impl winit::application::ApplicationHandler for View {
         self.attach_plug_view().unwrap();
         let mut view_rect: MaybeUninit<ViewRect> = MaybeUninit::uninit();
         unsafe {
+            let self_ = &mut *self as *mut Self;
             let plug_view = self.plugin.classes[0].plug_view.as_com_ref();
             plug_view.getSize(view_rect.as_mut_ptr());
+            plug_view.setFrame(self_ as *mut IPlugFrame);
         }
         let view_rect = unsafe {
             std::mem::transmute::<std::mem::MaybeUninit<ViewRect>, ViewRect>(view_rect)
