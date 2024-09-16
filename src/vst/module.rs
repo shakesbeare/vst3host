@@ -9,7 +9,7 @@ use core_foundation::{
     string::CFString,
     url::{kCFURLPOSIXPathStyle, CFURL},
 };
-use vst3::{ComPtr, Steinberg::IPluginFactory};
+use vst3::{ComPtr, Steinberg::IPluginFactory3 as IPluginFactory};
 
 #[cfg(target_os = "macos")]
 const OS_LABEL: &str = "MacOS";

@@ -1,19 +1,17 @@
 use anyhow::{bail, Result};
 use num_traits::ToPrimitive;
 use std::ffi::c_void;
-use std::sync::Arc;
 use std::{ffi::CStr, mem::MaybeUninit};
 use thiserror::Error;
+use vst3::com_scrape_types::SmartPtr;
 use vst3::Steinberg::Vst::ViewType::kEditor;
 use vst3::Steinberg::Vst::{
-    IComponent, IComponentTrait, IEditController, IEditControllerTrait,
-    IHostApplication, IoModes_,
+    IComponent, IComponentTrait, IEditController, IEditControllerTrait, IoModes_,
 };
 use vst3::Steinberg::{
-    kResultTrue, FUnknown, IPlugView, IPluginBaseTrait, IPluginFactory,
-    IPluginFactoryTrait, PClassInfo, PFactoryInfo,
+    kResultTrue, FUnknown, IPlugView, IPluginBase, IPluginBaseTrait, IPluginFactory3 as IPluginFactory, IPluginFactory3Trait, IPluginFactoryTrait, PClassInfo, PFactoryInfo
 };
-use vst3::{ComPtr, ComRef, Interface};
+use vst3::{ComPtr, Interface};
 
 use crate::TResult;
 
@@ -47,15 +45,13 @@ pub struct ClassMetadata {
 }
 
 impl<'a> VstPlugin<'a> {
-    pub fn new(
-        module: &'a module::Module,
-        host: &mut host::PluginHost,
-    ) -> Result<Self> {
+    pub fn new(module: &'a module::Module, host: &mut host::PluginHost) -> Result<Self> {
         if !module.entry() {
             bail!(PluginError::EntryFailed);
         }
 
         let mut factory = module.factory().into_vstptr(module);
+        unsafe { factory.setHostContext(std::ptr::null_mut()) };
         let num_classes = unsafe { module.factory().countClasses() };
 
         let mut factory_info: MaybeUninit<PFactoryInfo> = MaybeUninit::uninit();
@@ -125,13 +121,16 @@ impl<'a> PluginClass<'a> {
         }
 
         let component_ptr: *mut IComponent = unsafe { component.assume_init() };
-        let component =
-            unsafe { ComPtr::from_raw(component_ptr).unwrap() }.into_vstptr(&module);
+        let base_ptr: *mut IPluginBase = component_ptr.cast();
+        let base = unsafe { ComPtr::from_raw(base_ptr).unwrap() }.into_vstptr(module);
+        let component = unsafe { ComPtr::from_raw(component_ptr).unwrap() }.into_vstptr(module);
         unsafe { component.setIoMode(IoModes_::kAdvanced as i32) };
 
         // let hostptr = unsafe { ComRef::from_raw(host as *mut host::PluginHost as *mut FUnknown).unwrap() };
         // unsafe { component.initialize(hostptr.as_ptr()) };
-        unsafe { component.initialize(std::ptr::null_mut()) };
+        if unsafe { base.initialize(std::ptr::null_mut()) } != kResultTrue {
+            tracing::error!("Failed to initialize plugin component");
+        }
 
         let mut edit: MaybeUninit<*mut IEditController> = MaybeUninit::uninit();
         let create_instance_result = unsafe {
@@ -151,17 +150,19 @@ impl<'a> PluginClass<'a> {
 
         // Can now assume that edit points to valid memory
         let edit_ptr: *mut IEditController = unsafe { edit.assume_init() };
-        let edit_controller =
-            unsafe { ComPtr::from_raw(edit_ptr).unwrap() }.into_vstptr(module);
+        let edit_controller = unsafe { ComPtr::from_raw(edit_ptr).unwrap() }.into_vstptr(module);
+        let base_ptr: *mut IPluginBase = edit_ptr.cast();
+        let base = unsafe { ComPtr::from_raw(base_ptr).unwrap() }.into_vstptr(module);
 
         // unsafe { component.initialize(host as *mut  host::PluginHost as *mut FUnknown) };
-        unsafe { component.initialize(std::ptr::null_mut()) };
+        if unsafe { base.initialize(std::ptr::null_mut()) } != kResultTrue {
+            tracing::error!("Failed to initialize an edit controller");
+        }
 
         let view_ptr = unsafe { edit_controller.createView(kEditor) };
-        let plug_view = unsafe {
-            std::mem::transmute::<*mut IPlugView, ComPtr<IPlugView>>(view_ptr)
-        }
-        .into_vstptr(module);
+        let plug_view =
+            unsafe { std::mem::transmute::<*mut IPlugView, ComPtr<IPlugView>>(view_ptr) }
+                .into_vstptr(module);
 
         Ok(PluginClass {
             metadata: ClassMetadata { name, category },

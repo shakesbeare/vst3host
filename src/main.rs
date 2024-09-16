@@ -104,6 +104,7 @@ impl<'a> IPlugFrameTrait for View<'a> {
         view: *mut IPlugView,
         newSize: *mut ViewRect,
     ) -> tresult {
+        dbg!();
         let Some(ref window) = self.window else {
             return kResultFalse;
         };
