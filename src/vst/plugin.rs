@@ -73,7 +73,7 @@ impl<'a> VstPlugin<'a> {
         let metadata = PluginMetadata { url, email, vendor };
         let mut classes = vec![];
         for i in 0..num_classes {
-            classes.push(PluginClass::new(&mut factory, i, host, module)?);
+            PlugProvider
         }
 
         Ok(VstPlugin {
