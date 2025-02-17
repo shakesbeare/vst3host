@@ -1,15 +1,15 @@
 # Building the Project
 
-## (1) Ensure dependencies are downloaded
+## (1) Ensure dependencies are downloaded (One-time only)
 
 ```bash
 git clone https://github.com/steinbergmedia/vst3sdk deps/vst3sdk --recursive
 ```
 
-## (1a) Ensure build dependencies are installed
-## Nix users can run `nix develop`
+## (1a) Ensure build dependencies are installed (One-time only)
+- Nix users can run `nix develop`
 
-## Configure the project with CMake
+## (2) Configure the project with CMake (Whenever CMakeLists.txt is modified)
 ```bash
 cmake -B build
 
@@ -21,7 +21,7 @@ cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 cmake -B build -DCMAKE_C_COMPILER=$(which clang)
 ```
 
-## Build the Project
+## (3) Build the Project
 ```bash
 # This may take a while the first time...
 cmake --build build
