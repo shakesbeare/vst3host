@@ -6,9 +6,11 @@
 git clone https://github.com/steinbergmedia/vst3sdk deps/vst3sdk --recursive
 ```
 
-## (1a) Ensure build dependencies are installed (One-time only)
+## (1a) Ensure system dependencies are installed (One-time only)
+One or many of these may already be installed in a gui environment
 ```bash
-sudo apt install libx11-dev pkg-config
+# Ubuntu
+sudo apt install libx11-dev pkg-config libfreetype6-dev libxcb-util-dev libxcb-cursor-dev libxcb-keysyms1-dev libxcb-xkb-dev libxkbcommon-dev libxkbcommon-x11-dev libcairo2-dev libpango1.0-dev libgtkmm-3.0-dev libsqlite3-dev
 ```
 - Nix users can run `nix develop`
 
