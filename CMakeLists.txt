@@ -1,17 +1,19 @@
 cmake_minimum_required(VERSION 3.21)
 project(editorhost LANGUAGES CXX)
 
-set(vst3sdk_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vst3sdk")
+set(vst3sdk_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/deps/vst3sdk")
 list(APPEND CMAKE_MODULE_PATH "${vst3sdk_SOURCE_DIR}/cmake/modules")
+
 include(SMTG_VST3_SDK)
 smtg_setup_platform_toolset()
 smtg_setup_symbol_visibility()
 
 add_compile_definitions(DEVELOPMENT=true)
 
-set(SMTG_ENABLE_VST3_PLUGIN_EXAMPLES FALSE)
-set(SMTG_ENABLE_VST3_HOSTING_EXAMPLES FALSE)
-set(SMTG_ENABLE_VSTGUI_SUPPORT FALSE)
+set(SMTG_ENABLE_VST3_PLUGIN_EXAMPLES OFF)
+set(SMTG_ENABLE_VST3_HOSTING_EXAMPLES OFF)
+set(SMTG_ENABLE_VSTGUI_SUPPORT OFF)
+set(SMTG_RUN_VST_VALIDATOR OFF)
 
 set(editorhost_sources 
     src/main.cpp

@@ -1,1 +1,8 @@
 /target
+/build/*
+/build
+build/
+build
+/CMakeFiles
+/vst3sdk
+result
