@@ -11,12 +11,15 @@
   in
   {
       devShells.x86_64-linux.default = pkgs.mkShell {
-          packages = with pkgs; [
-              llvmPackages.libclang
-              clang
+          nativeBuildInputs = with pkgs; [
+              pkg-config
+              xorg.libX11
+              xorg.libXrandr
+              xorg.libXinerama
+              xorg.libXcursor
+              xorg.libXi
           ];
-          LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
-          shellHook = "exec $SHELL";
+          shellHook = "exec zsh";
       };
   };
 }
