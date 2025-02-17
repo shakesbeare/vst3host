@@ -7,6 +7,9 @@ git clone https://github.com/steinbergmedia/vst3sdk deps/vst3sdk --recursive
 ```
 
 ## (1a) Ensure build dependencies are installed (One-time only)
+```bash
+sudo apt install libx11-dev pkgconfig
+```
 - Nix users can run `nix develop`
 
 ## (2) Configure the project with CMake (Whenever CMakeLists.txt is modified)
