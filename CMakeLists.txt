@@ -18,6 +18,7 @@ set(SMTG_RUN_VST_VALIDATOR OFF)
 
 set(editorhost_sources 
     src/main.cpp
+    src/window.cpp
 )
 
 add_subdirectory(${vst3sdk_SOURCE_DIR} ${PROJECT_BINARY_DIR}/vst3sdk)
