@@ -1,12 +1,11 @@
 # Building the Project
 
-## (1) Ensure dependencies are downloaded (One-time only)
-
+## (1) Clone the repository 
 ```bash
-git clone https://github.com/steinbergmedia/vst3sdk deps/vst3sdk --recursive
-git clone https://github.com/glfw/glfw deps/glfw
+git clone git@github.com/shakesbeare --recursive
 ```
-## (1a) Ensure system dependencies are installed (One-time only)
+
+## (2) Ensure system dependencies are installed
 One or many of these may already be installed in a gui environment
 ```bash
 # Ubuntu
@@ -14,7 +13,7 @@ sudo apt install libx11-dev pkg-config libfreetype6-dev libxcb-util-dev libxcb-c
 ```
 - Nix users can run `nix develop`
 
-## (2) Configure the project with CMake (Whenever CMakeLists.txt is modified)
+## (3) Configure the project with CMake (Whenever CMakeLists.txt is modified)
 ```bash
 cmake -B build
 
@@ -26,7 +25,7 @@ cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 cmake -B build -DCMAKE_C_COMPILER=$(which clang)
 ```
 
-## (3) Build the Project
+## (4) Build the Project
 ```bash
 # This may take a while the first time...
 cmake --build build
