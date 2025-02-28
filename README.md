@@ -4,8 +4,8 @@
 
 ```bash
 git clone https://github.com/steinbergmedia/vst3sdk deps/vst3sdk --recursive
+git clone https://github.com/glfw/glfw deps/glfw
 ```
-
 ## (1a) Ensure system dependencies are installed (One-time only)
 One or many of these may already be installed in a gui environment
 ```bash
@@ -32,8 +32,7 @@ cmake -B build -DCMAKE_C_COMPILER=$(which clang)
 cmake --build build
 ```
 
-
 # Running the Project
 ```bash
-./build/bin/editorhost
+./build/editorhost
 ```

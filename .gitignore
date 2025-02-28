@@ -7,4 +7,5 @@ build
 /vst3sdk
 /sdl
 sdl/
+.cache/
 result
