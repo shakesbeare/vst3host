@@ -5,4 +5,6 @@ build/
 build
 /CMakeFiles
 /vst3sdk
+/sdl
+sdl/
 result
