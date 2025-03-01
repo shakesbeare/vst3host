@@ -77,16 +77,20 @@ int WindowController::get_id() {
 WindowManager::WindowManager() 
     : next_id { 0 } {}
 
-void WindowManager::new_window(char* title) {
-    WindowController w = WindowController { next_id, title };
-    windows.push_back(std::move(w));
+int WindowManager::new_window(char* title) {
+    int id = next_id;
     next_id += 1;
+    WindowController w = WindowController { id, title };
+    windows.push_back(std::move(w));
+    return id;
 }
 
-void WindowManager::new_window(char* title, int width, int height) {
-    WindowController w = WindowController { next_id, title, width, height };
-    windows.push_back(std::move(w));
+int WindowManager::new_window(char* title, int width, int height) {
+    int id = next_id;
     next_id += 1;
+    WindowController w = WindowController { id, title, width, height };
+    windows.push_back(std::move(w));
+    return id;
 }
 
 WindowController& WindowManager::get_window(int id) {

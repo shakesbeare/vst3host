@@ -62,10 +62,10 @@ int main() {
         return -1;
     }
 
-    wm.new_window((char*)"Editor", plug_view_size.getWidth(), plug_view_size.getHeight());
-    auto handle = wm.get_window(0).get_native_ptr();
+    int id = wm.new_window((char*)"Editor", plug_view_size.getWidth(), plug_view_size.getHeight());
+    auto handle = wm.get_window(id).get_native_ptr();
 
-    view->setFrame(&wm.get_window(0));
+    view->setFrame(&wm.get_window(id));
 
     if (view->attached(handle.handle.hwnd, "HWND") != Steinberg::kResultTrue) {
         std::println("Attaching PlugView failed");

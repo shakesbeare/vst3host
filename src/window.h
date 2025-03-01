@@ -107,8 +107,8 @@ class WindowManager {
         WindowManager();
         virtual ~WindowManager() noexcept = default;
 
-        void new_window(char* title);
-        void new_window(char* title, int width, int height);
+        int new_window(char* title);
+        int new_window(char* title, int width, int height);
         WindowController& get_window(int id);
         void remove_window(int id);
         void update_windows();
