@@ -1,3 +1,4 @@
+#include <iostream>
 #include <print>
 #include "GLFW/glfw3.h"
 #include "pluginterfaces/base/funknown.h"
@@ -59,6 +60,23 @@ int main() {
     }
     edit_controller->release(); // plug_provider does an addRef, this is important, I guess
     edit_controller->setComponentHandler(&gComponentHandler);
+
+    std::println("");
+    for (int i = 0; i < edit_controller->getParameterCount(); ++i) {
+        Steinberg::Vst::ParameterInfo info;
+        edit_controller->getParameterInfo(i, info);
+        std::println("Param {}", info.id);
+        std::wstring title (reinterpret_cast<wchar_t*>(info.title));
+        std::wcout << "\tTitle: " << title << std::endl;
+        std::wstring stitle (reinterpret_cast<wchar_t*>(info.shortTitle));
+        std::wcout << "\tShort Title: " << stitle << std::endl;
+        std::wstring units (reinterpret_cast<wchar_t*>(info.units));
+        std::wcout << "\tUnits: " << stitle << std::endl;
+        std::println("\tStep Count: {}", info.stepCount);
+        std::println("\tDefault Normalized Value: {}", info.defaultNormalizedValue);
+        std::println("\tUnit ID: {}", info.unitId);
+        std::println("\tFlags: {:b}", info.flags);
+    }
     
     // create view
     auto view = owned(edit_controller->createView(Steinberg::Vst::ViewType::kEditor));
