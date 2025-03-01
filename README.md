@@ -21,21 +21,14 @@ cmake -B build
 ```
 
 ### For Windows with MSVC
-- Open folder with Visual Studio
-- Build editorhost.exe
-
-### For Windows with clang (still requires Visual Studio):
-
-If you aren't sure you need this, you probably don't.
+In the Developer Powershell
 ```powershell
-winget install llvm
-cmake -B build -G "Ninja" # May need to start a new terminal session
+cmake -B build -G "Ninja"
 ```
 
 ## (4) Build the Project
 ```bash
-# For windows, must be in a Developer Powershell session
-# This may take a while the first time...
+# For windows, must in Developer Powershell
 cmake --build build
 ```
 
