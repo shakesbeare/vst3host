@@ -18,20 +18,40 @@ sudo apt install libx11-dev pkg-config libfreetype6-dev libxcb-util-dev libxcb-c
 cmake -B build
 
 # You may wish to export compile commands for Language Server Integration
+# Note: this only works with Ninja and Make generators
+# See Windows with clang for Windows details
+# If you don't know what this means, skip it
 cmake -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
 # You may wish to specify a specific backend
 # For example, clang
 cmake -B build -DCMAKE_C_COMPILER=$(which clang)
 ```
+### For Windows with MSVC
+- Open folder with Visual Studio
+- Build editorhost.exe
+
+### For Windows with clang (still requires Visual Studio):
+
+If you aren't sure you need this, you probably don't.
+```powershell
+winget install llvm
+cmake -B build -G "Ninja" # May need to start a new terminal session
+```
 
 ## (4) Build the Project
 ```bash
 # This may take a while the first time...
+# For windows, must be in a Developer Powershell session
 cmake --build build
 ```
 
 # Running the Project
 ```bash
+# Linux and MacOS
 ./build/editorhost
+
+# Windows
+.\build\Debug\editorhost
+
 ```

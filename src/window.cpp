@@ -37,7 +37,7 @@ GLFWwindow* WindowController::get_window_ptr() {
 
 NativeWinHandle WindowController::get_native_ptr() {
 #ifdef _WIN32
-    RawWinHandle raw = { .hwnd=glfwGetWin32Window(handle) };
+    RawWinHandle raw = { .hwnd=glfwGetWin32Window(ptr) };
     WinHandleTag tag = WinHandleTag::Win32;
     return {.tag=tag, .handle=raw };
 #elif LINUX_WAYLAND
@@ -45,11 +45,11 @@ NativeWinHandle WindowController::get_native_ptr() {
     WinHandleTag tag = WinHandleTag::Wayland;
     return { .tag=tag, .handle=raw };
 #elif LINUX_X11
-    RawWinHandle raw = { .wl_surface=glfwGetX11Window(handle) };
+    RawWinHandle raw = { .wl_surface=glfwGetX11Window(ptr) };
     WinHandleTag tag = WinHandleTag::X11;
     return { .tag=tag, .handle=raw };
 #elif __APPLE__
-    RawWinHandle raw = { .wl_surface=glfwGetCocoaWindow(handle) };
+    RawWinHandle raw = { .wl_surface=glfwGetCocoaWindow(ptr) };
     WinHandleTag tag = WinHandleTag::Cocoa;
     return { .tag=tag, .handle=raw };
 #else

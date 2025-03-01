@@ -25,7 +25,7 @@
 #include <X11/Xlib.h>
 #endif
 
-#ifndef __WIN32
+#ifndef _WIN32
 typedef std::nullptr_t HWND;
 #endif
 
@@ -34,7 +34,7 @@ typedef std::nullptr_t NSWindow;
 #endif
 
 #ifndef LINUX_WAYLAND
-typedef std::nullptr_t wl_surface;
+struct wl_surface {};
 #endif
 
 #ifndef LINUX_X11

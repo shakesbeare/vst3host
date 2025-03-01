@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
+set(CMAKE_TRY_COMPILE_TARGET_TYPE "STATIC_LIBRARY")
 project(editorhost LANGUAGES CXX)
 set(target editorhost)
 
@@ -19,7 +20,29 @@ set(SMTG_RUN_VST_VALIDATOR OFF)
 set(editorhost_sources 
     src/main.cpp
     src/window.cpp
+    src/module.cpp
 )
+
+if (SMTG_WIN)
+    set(editorhost_sources
+        ${editorhost_sources}
+        ${vst3sdk_SOURCE_DIR}/public.sdk/source/vst/hosting/module_win32.cpp
+    )
+elseif(SMTG_MAC)
+    set(editorhost_sources
+        ${editorhost_sources}
+        ${vst3sdk_SOURCE_DIR}/public.sdk/source/vst/hosting/module_mac.mm
+    )
+    set_source_files_properties(
+        "${vst3sdk_SOURCE_DIR}/public.sdk/source/vst/hosting/module_mac.mm" PROPERTIES
+        COMPILE_FLAGS "-fobjc-arc"
+    )
+elseif(SMTG_LINUX)
+    set(editorhost_sources
+        ${editorhost_sources}
+        ${vst3sdk_SOURCE_DIR}/public.sdk/source/vst/hosting/module_linux.cpp
+    )
+endif()
 
 add_subdirectory(${vst3sdk_SOURCE_DIR} ${PROJECT_BINARY_DIR}/vst3sdk)
 
@@ -57,13 +80,18 @@ if (APP_PROPERTIES)
     )
 endif(APP_PROPERTIES)
 
-if(DEFINED ENV{WAYLAND_DISPLAY})
-    add_compile_definitions(LINUX_WAYLAND)
-    set(GLFW_BUILD_WAYLAND ON)
-    set(GLFW_BUILD_X11 OFF)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    if(DEFINED ENV{WAYLAND_DISPLAY})
+        add_compile_definitions(LINUX_WAYLAND)
+        set(GLFW_BUILD_WAYLAND ON)
+        set(GLFW_BUILD_X11 OFF)
+    else() 
+        add_compile_definitions(LINUX_X11)
+        set(GLFW_BUILD_X11 ON)
+        set(GLFW_BUILD_WAYLAND OFF)
+    endif()
 else()
-    add_compile_definitions(LINUX_X11)
-    set(GLFW_BUILD_X11 ON)
+    set(GLFW_BUILD_X11 OFF)
     set(GLFW_BUILD_WAYLAND OFF)
 endif()
 
