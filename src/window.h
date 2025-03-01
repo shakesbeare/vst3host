@@ -5,6 +5,9 @@
 #include <memory>
 #include <vector>
 
+#include "pluginterfaces/gui/iplugview.h"
+#include "pluginterfaces/base/funknown.h"
+
 #ifdef _WIN32
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <Windows.h>
@@ -65,29 +68,47 @@ struct NativeWinHandle {
     RawWinHandle handle {};
 };
 
-class WindowController {
+class WindowController : public Steinberg::IPlugFrame {
 public:
     WindowController(int id, char* title);
+    WindowController(int id, char* title, int width, int height);
     WindowController(const WindowController&) = delete;
     WindowController& operator=(const WindowController&) = delete;
 
 	WindowController(WindowController&& a) noexcept;
     WindowController& operator=(WindowController&& a) noexcept;
-    ~WindowController();
+    virtual ~WindowController();
 
     GLFWwindow* get_window_ptr();
     NativeWinHandle get_native_ptr();
     int get_id();
+    virtual Steinberg::tresult PLUGIN_API resizeView(Steinberg::IPlugView* view, Steinberg::ViewRect* newSize) override;
+
+    Steinberg::tresult PLUGIN_API queryInterface(const Steinberg::TUID _iid, void** obj) override {
+        if (Steinberg::FUnknownPrivate::iidEqual(_iid, IPlugFrame::iid) ||
+                Steinberg::FUnknownPrivate::iidEqual(_iid, FUnknown::iid)) {
+            *obj = this;
+            addRef();
+            return Steinberg::kResultTrue;
+        }
+
+        return Steinberg::kNoInterface;
+    }
+
+    Steinberg::uint32 PLUGIN_API addRef() override { return 1000; }
+    Steinberg::uint32 PLUGIN_API release() override { return 1000; }
 private:
-    GLFWwindow* ptr {};
     int id {};
+    GLFWwindow* ptr {};
 };
 
 class WindowManager {
     public:
         WindowManager();
+        virtual ~WindowManager() noexcept = default;
 
         void new_window(char* title);
+        void new_window(char* title, int width, int height);
         WindowController& get_window(int id);
         void remove_window(int id);
         void update_windows();

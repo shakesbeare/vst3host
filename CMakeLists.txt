@@ -18,6 +18,8 @@ set(SMTG_ENABLE_VSTGUI_SUPPORT OFF)
 set(SMTG_RUN_VST_VALIDATOR OFF)
 
 set(editorhost_sources 
+    ${vst3sdk_SOURCE_DIR}/public.sdk/source/vst/hosting/plugprovider.cpp
+    ${vst3sdk_SOURCE_DIR}/public.sdk/source/vst/hosting/plugprovider.h
     src/main.cpp
     src/window.cpp
     src/module.cpp

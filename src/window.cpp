@@ -1,14 +1,27 @@
 #include "window.h"
 #include "GLFW/glfw3.h"
 #include "GLFW/glfw3native.h"
+#include <print>
 #include <stdexcept>
 
+Steinberg::tresult PLUGIN_API WindowController::resizeView(Steinberg::IPlugView* view, Steinberg::ViewRect* newSize) {
+    glfwSetWindowSize(ptr, newSize->getWidth(), newSize->getHeight());
+    return 0;
+}
+
 WindowController::WindowController(int id, char* title)
-    : id { id }, ptr { glfwCreateWindow(800, 600, title, NULL, NULL) }{
-        if (!ptr) {
-            throw std::runtime_error("Failed to initialize window");
-        }
+    : id { id }, ptr { glfwCreateWindow(800, 600, title, NULL, NULL) } {
+    if (!ptr) {
+        throw std::runtime_error("Failed to initialize window");
     }
+}
+
+WindowController::WindowController(int id, char* title, int width, int height)
+    : id { id }, ptr { glfwCreateWindow(width, height, title, NULL, NULL) } {
+    if (!ptr) {
+        throw std::runtime_error("Failed to initialize window");
+    }
+}
 
 WindowController::WindowController(WindowController&& a) noexcept
 : id { a.id }, ptr { a.ptr }
@@ -62,10 +75,16 @@ int WindowController::get_id() {
 }
 
 WindowManager::WindowManager() 
-    : next_id { 0 }
-{}
+    : next_id { 0 } {}
+
 void WindowManager::new_window(char* title) {
     WindowController w = WindowController { next_id, title };
+    windows.push_back(std::move(w));
+    next_id += 1;
+}
+
+void WindowManager::new_window(char* title, int width, int height) {
+    WindowController w = WindowController { next_id, title, width, height };
     windows.push_back(std::move(w));
     next_id += 1;
 }

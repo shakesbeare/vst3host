@@ -1,7 +1,12 @@
 #include <print>
 #include "GLFW/glfw3.h"
+#include "pluginterfaces/base/funknown.h"
+#include "pluginterfaces/base/smartpointer.h"
+#include "pluginterfaces/gui/iplugview.h"
+#include "public.sdk/source/vst/hosting/plugprovider.h"
 #include "window.h"
 #include "public.sdk/source/vst/hosting/module.h"
+#include "pluginterfaces/vst/ivstaudioprocessor.h"
 
 static void error_callback(int error, const char* description) {
     std::println("GLFW Error: {}", description);
@@ -11,17 +16,61 @@ int main() {
     glfwSetErrorCallback(error_callback);
     if (!glfwInit()) {
     }
+    glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
+
+
+    WindowManager wm = WindowManager();
 
     std::string error;
     auto mod = VST3::Hosting::Module::create("C:/Program Files/Common Files/VST3/OTT.vst3", error);
+    Steinberg::IPtr<Steinberg::Vst::PlugProvider> plug_provider {nullptr};
     if (!mod) {
         std::println("Failed to load module");
         std::println("{}", error);
         return -1;
     }
 
-    WindowManager wm = WindowManager();
-    wm.new_window((char*)"Window 1");
+    auto factory = mod->getFactory();
+
+
+    for (auto& class_info : factory.classInfos()) {
+        if (class_info.category() == kVstAudioEffectClass) {
+            plug_provider = Steinberg::owned(new Steinberg::Vst::PlugProvider(factory, class_info, true));
+            if (plug_provider->initialize() == false)
+                plug_provider = nullptr;
+            break;
+        }
+    }
+
+    if (!plug_provider) {
+        std::println("No VST3 Audio Module Class");
+        return -1;
+    }
+
+    auto edit_controller = plug_provider->getController();
+    if (!edit_controller) {
+        std::println("No EditController found");
+        return -1;
+    }
+    
+    // create view
+    auto view = owned(edit_controller->createView(Steinberg::Vst::ViewType::kEditor));
+    Steinberg::ViewRect plug_view_size {};
+    auto result = view->getSize(&plug_view_size);
+    if (result != Steinberg::kResultTrue) {
+        std::println("Could not get editor view size");
+        return -1;
+    }
+
+    wm.new_window((char*)"Editor", plug_view_size.getWidth(), plug_view_size.getHeight());
+    auto handle = wm.get_window(0).get_native_ptr();
+
+    view->setFrame(&wm.get_window(0));
+
+    if (view->attached(handle.handle.hwnd, "HWND") != Steinberg::kResultTrue) {
+        std::println("Attaching PlugView failed");
+        return -1;
+    }
 
     while (wm.has_active_windows()) {
         wm.update_windows();
