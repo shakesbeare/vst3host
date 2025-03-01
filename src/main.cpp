@@ -4,13 +4,18 @@
 #include "pluginterfaces/base/smartpointer.h"
 #include "pluginterfaces/gui/iplugview.h"
 #include "public.sdk/source/vst/hosting/plugprovider.h"
-#include "window.h"
 #include "public.sdk/source/vst/hosting/module.h"
 #include "pluginterfaces/vst/ivstaudioprocessor.h"
+
+#include "window.h"
+#include "component_handler.h"
+
 
 static void error_callback(int error, const char* description) {
     std::println("GLFW Error: {}", description);
 }
+
+static ComponentHandler gComponentHandler;
 
 int main() {
     glfwSetErrorCallback(error_callback);
@@ -52,6 +57,8 @@ int main() {
         std::println("No EditController found");
         return -1;
     }
+    edit_controller->release(); // plug_provider does an addRef, this is important, I guess
+    edit_controller->setComponentHandler(&gComponentHandler);
     
     // create view
     auto view = owned(edit_controller->createView(Steinberg::Vst::ViewType::kEditor));

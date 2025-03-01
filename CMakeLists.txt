@@ -23,6 +23,7 @@ set(editorhost_sources
     src/main.cpp
     src/window.cpp
     src/module.cpp
+    src/component_handler.cpp
 )
 
 if (SMTG_WIN)

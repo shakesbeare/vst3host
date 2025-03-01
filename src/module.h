@@ -1,6 +1,4 @@
-#ifndef EDITORHOST_MODULE
-#define EDITORHOST_MODULE
-
+#pragma once
 #include "public.sdk/source/vst/hosting/module.h"
 
 class Module {
@@ -9,5 +7,3 @@ public:
 private:
     VST3::Hosting::Module::Ptr module {nullptr};
 };
-
-#endif

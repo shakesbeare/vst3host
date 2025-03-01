@@ -1,6 +1,4 @@
-#ifndef EDITORHOST_WINDOW
-#define EDITORHOST_WINDOW
-
+#pragma once
 #include "GLFW/glfw3.h"
 #include <memory>
 #include <string>
@@ -145,4 +143,3 @@ class WindowManager {
         std::vector<WindowController> windows;
         int next_id {};
 };
-#endif
