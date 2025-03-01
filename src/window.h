@@ -3,6 +3,7 @@
 
 #include "GLFW/glfw3.h"
 #include <memory>
+#include <string>
 #include <vector>
 
 #include "pluginterfaces/gui/iplugview.h"
@@ -63,9 +64,34 @@ enum WinHandleTag {
     Wayland
 };
 
-struct NativeWinHandle {
+class NativeWinHandle {
+public:
     WinHandleTag tag {};
     RawWinHandle handle {};
+
+    void* as_ptr() {
+#ifdef _WIN32
+        return (void*)handle.hwnd;
+#elif LINUX_WAYLAND
+        return (void*)handle.wl_surface;
+#elif LINUX_X11
+        return (void*)handle.x_window;
+#elif __APPLE__
+        return (void*)handle.ns_window;
+#endif
+    }
+
+    char* window_type() {
+#ifdef _WIN32
+        return (char*)"HWND";
+#elif LINUX_WAYLAND
+        return (char*)"WL_Surface";
+#elif LINUX_X11
+        return (char*)"XWindow";
+#elif __APPLE__
+        return (char*)"NSWindow";
+#endif
+    }
 };
 
 class WindowController : public Steinberg::IPlugFrame {

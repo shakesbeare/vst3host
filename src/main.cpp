@@ -67,7 +67,7 @@ int main() {
 
     view->setFrame(&wm.get_window(id));
 
-    if (view->attached(handle.handle.hwnd, "HWND") != Steinberg::kResultTrue) {
+    if (view->attached(handle.as_ptr(), handle.window_type()) != Steinberg::kResultTrue) {
         std::println("Attaching PlugView failed");
         return -1;
     }
