@@ -57,3 +57,13 @@ if (APP_PROPERTIES)
     )
 endif(APP_PROPERTIES)
 
+if(DEFINED ENV{WAYLAND_DISPLAY})
+    add_compile_definitions(LINUX_WAYLAND)
+    set(GLFW_BUILD_WAYLAND ON)
+    set(GLFW_BUILD_X11 OFF)
+else()
+    add_compile_definitions(LINUX_X11)
+    set(GLFW_BUILD_X11 ON)
+    set(GLFW_BUILD_WAYLAND OFF)
+endif()
+

@@ -12,7 +12,7 @@ int main() {
         std::println("Failed to initialize GLFW");
     }
 
-    WindowManager wm = WindowManager ();
+    WindowManager wm = WindowManager();
     wm.new_window((char*)"Window 1");
     wm.new_window((char*)"Window 2");
     wm.new_window((char*)"Window 3");
@@ -22,6 +22,5 @@ int main() {
     }
 
     std::println("No remaining windows, exiting");
-
     return 0;
 }
