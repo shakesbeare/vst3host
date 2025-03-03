@@ -11,16 +11,16 @@ namespace Host {
         return 0;
     }
 
-    Host::WindowController::WindowController(int id, char *title)
-        : m_id{id}, m_ptr{glfwCreateWindow(800, 600, title, NULL, NULL)} {
+    Host::WindowController::WindowController(int id, const std::string& title)
+        : m_id{id}, m_ptr{glfwCreateWindow(800, 600, title.c_str(), NULL, NULL)} {
         if (!m_ptr) {
             throw std::runtime_error("Failed to initialize window");
         }
     }
 
-    WindowController::WindowController(int id, char *title, int width,
+    WindowController::WindowController(int id, const std::string& title, int width,
                                        int height)
-        : m_id{id}, m_ptr{glfwCreateWindow(width, height, title, NULL, NULL)} {
+        : m_id{id}, m_ptr{glfwCreateWindow(width, height, title.c_str(), NULL, NULL)} {
         if (!m_ptr) {
             throw std::runtime_error("Failed to initialize window");
         }
@@ -69,11 +69,11 @@ namespace Host {
 #endif
     }
 
-    int WindowController::get_id() { return m_id; }
+    int WindowController::getId() { return m_id; }
 
     WindowManager::WindowManager() : m_nextId{0} {}
 
-    int WindowManager::newWindow(char *title) {
+    int WindowManager::newWindow(const std::string& title) {
         int id = m_nextId;
         m_nextId += 1;
         WindowController w = WindowController{id, title};
@@ -81,7 +81,7 @@ namespace Host {
         return id;
     }
 
-    int WindowManager::newWindow(char *title, int width, int height) {
+    int WindowManager::newWindow(const std::string& title, int width, int height) {
         int id = m_nextId;
         m_nextId += 1;
         WindowController w = WindowController{id, title, width, height};
@@ -91,7 +91,7 @@ namespace Host {
 
     WindowController &WindowManager::getWindow(int id) {
         for (auto &window : m_windows) {
-            if (window.get_id() == id)
+            if (window.getId() == id)
                 return window;
         }
         throw std::out_of_range("Window not found");
@@ -100,7 +100,7 @@ namespace Host {
     void WindowManager::removeWindow(int id) {
         auto it = std::ranges::find_if(
             m_windows.begin(), m_windows.end(),
-            [id](WindowController &w) { return w.get_id() == id; });
+            [id](WindowController &w) { return w.getId() == id; });
 
         if (it != m_windows.end()) {
             m_windows.erase(it);
@@ -122,7 +122,7 @@ namespace Host {
                 throw std::runtime_error("Tried to update a null window");
             glfwMakeContextCurrent(w);
             if (glfwWindowShouldClose(w)) {
-                marked_remove.push_back(window.get_id());
+                marked_remove.push_back(window.getId());
                 continue;
             }
             glClear(GL_COLOR_BUFFER_BIT);

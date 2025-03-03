@@ -1,20 +1,10 @@
 #include "GLFW/glfw3.h"
-#include "pluginterfaces/base/funknown.h"
-#include "pluginterfaces/base/smartpointer.h"
-#include "pluginterfaces/gui/iplugview.h"
-#include "pluginterfaces/vst/ivstaudioprocessor.h"
-#include "public.sdk/source/vst/hosting/module.h"
-#include "public.sdk/source/vst/hosting/plugprovider.h"
-#include <iostream>
 #include <print>
 
 #include "app.h"
-#include "component_handler.h"
 #include "window.h"
 
 namespace Host {
-    static ComponentHandler gComponentHandler;
-
     static void error_callback(int error, const char *description) {
         std::println("GLFW Error: {}", description);
     }
@@ -29,78 +19,11 @@ namespace Host {
     App::~App() {}
 
     void App::run() {
-        std::string error;
-        auto mod = VST3::Hosting::Module::create(
-            "C:/Program Files/Common Files/VST3/OTT.vst3", error);
-        Steinberg::IPtr<Steinberg::Vst::PlugProvider> plug_provider{nullptr};
-        if (!mod) {
-            std::println("{}", error);
-            throw std::runtime_error("Failed to load module");
-        }
 
-        auto factory = mod->getFactory();
-
-        for (auto &class_info : factory.classInfos()) {
-            if (class_info.category() == kVstAudioEffectClass) {
-                plug_provider =
-                    Steinberg::owned(new Steinberg::Vst::PlugProvider(
-                        factory, class_info, true));
-                if (plug_provider->initialize() == false)
-                    plug_provider = nullptr;
-                break;
-            }
-        }
-
-        if (!plug_provider) {
-            throw std::runtime_error("No VST3 Audio Module Class");
-        }
-
-        auto edit_controller = plug_provider->getController();
-        if (!edit_controller) {
-            throw std::runtime_error("No EditController found");
-        }
-        edit_controller->release(); // plug_provider does an addRef, this is
-                                    // important, I guess
-        edit_controller->setComponentHandler(&gComponentHandler);
-
-        std::println("");
-        for (int i = 0; i < edit_controller->getParameterCount(); ++i) {
-            Steinberg::Vst::ParameterInfo info;
-            edit_controller->getParameterInfo(i, info);
-            std::println("Param {}", info.id);
-            std::wstring title(reinterpret_cast<wchar_t *>(info.title));
-            std::wcout << "\tTitle: " << title << std::endl;
-            std::wstring stitle(reinterpret_cast<wchar_t *>(info.shortTitle));
-            std::wcout << "\tShort Title: " << stitle << std::endl;
-            std::wstring units(reinterpret_cast<wchar_t *>(info.units));
-            std::wcout << "\tUnits: " << stitle << std::endl;
-            std::println("\tStep Count: {}", info.stepCount);
-            std::println("\tDefault Normalized Value: {}",
-                         info.defaultNormalizedValue);
-            std::println("\tUnit ID: {}", info.unitId);
-            std::println("\tFlags: {:b}", info.flags);
-        }
-
-        // create view
-        auto view = owned(
-            edit_controller->createView(Steinberg::Vst::ViewType::kEditor));
-        Steinberg::ViewRect plug_view_size{};
-        auto result = view->getSize(&plug_view_size);
-        if (result != Steinberg::kResultTrue) {
-            throw std::runtime_error("Could not get editor view size");
-        }
-
-        int id = m_windowManager.newWindow((char *)"Editor",
-                                           plug_view_size.getWidth(),
-                                           plug_view_size.getHeight());
-        auto handle = m_windowManager.getWindow(id).getNativePtr();
-
-        view->setFrame(&m_windowManager.getWindow(id));
-
-        if (view->attached(handle.asPtr(), handle.windowType()) !=
-            Steinberg::kResultTrue) {
-            throw std::runtime_error("Attaching PlugView failed");
-        }
+        std::filesystem::path ott =
+            "C:/Program Files/Common Files/VST3/OTT.vst3";
+        auto plug = registerPlugin(ott);
+        createViewAndShow(plug.getName());
 
         while (m_windowManager.hasActiveWindows()) {
             m_windowManager.updateWindows();
@@ -108,4 +31,65 @@ namespace Host {
     }
 
     void App::exit() { m_windowManager.removeAllWindows(); }
+
+    WindowController &App::requestWindow(const std::string &title, int width,
+                                         int height) {
+        int id = m_windowManager.newWindow(title, width, height);
+        return m_windowManager.getWindow(id);
+    }
+
+    // TODO: find an open space instead of slamming it onto the end
+    Plugin::Plugin &App::registerPlugin(std::filesystem::path path) {
+        auto plugin = Plugin::Plugin(path);
+        m_plugins.push_back(plugin);
+        return m_plugins.back();
+    }
+
+    int64_t App::findPlugByName(const std::string &plugName) {
+        auto predicate = [plugName](Plugin::Plugin plug) {
+            return plug.getName() == plugName;
+        };
+        auto it = std::find_if(m_plugins.begin(), m_plugins.end(), predicate);
+        if (it != m_plugins.end()) {
+            return std::distance(m_plugins.begin(), it);
+        } else {
+            return -1;
+        }
+    }
+
+    void App::createViewAndShow(const std::string &plugName) {
+        int64_t index = findPlugByName(plugName);
+        if (index == -1) {
+            std::println("Failed to find plugin {}", plugName);
+            throw std::runtime_error("Plugin does not exist");
+        }
+
+        Plugin::Plugin plug = m_plugins[index];
+        auto plugProvider = plug.getPlugProvider();
+        auto editController = plugProvider->getController();
+        if (!editController) {
+            throw std::runtime_error("No EditController found");
+        }
+        editController->release(); // plug_provider does an addRef, this is
+                                   // important, I guess
+        editController->setComponentHandler(&Host::gComponentHandler);
+        auto view =
+            editController->createView(Steinberg::Vst::ViewType::kEditor);
+
+        Steinberg::ViewRect plugViewSize;
+        auto result = view->getSize(&plugViewSize);
+        if (result != Steinberg::kResultTrue) {
+            throw std::runtime_error("Could not get editor view size");
+        }
+
+        WindowController &win =
+            requestWindow(plug.getName().c_str(), plugViewSize.getWidth(),
+                          plugViewSize.getHeight());
+        auto handle = win.getNativePtr();
+        view->setFrame(&win);
+        if (view->attached(handle.asPtr(), handle.windowType()) !=
+            Steinberg::kResultTrue) {
+            throw std::runtime_error("Attaching PlugView failed");
+        }
+    }
 } // namespace Host

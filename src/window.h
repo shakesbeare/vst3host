@@ -95,8 +95,8 @@ namespace Host {
 
     class WindowController : public Steinberg::IPlugFrame {
     public:
-        WindowController(int id, char *title);
-        WindowController(int id, char *title, int width, int height);
+        WindowController(int id, const std::string& title);
+        WindowController(int id, const std::string& title, int width, int height);
         WindowController(const WindowController &) = delete;
         WindowController &operator=(const WindowController &) = delete;
 
@@ -106,7 +106,7 @@ namespace Host {
 
         GLFWwindow *getWindowPtr();
         NativeWinHandle getNativePtr();
-        int get_id();
+        int getId();
         virtual Steinberg::tresult PLUGIN_API resizeView(
             Steinberg::IPlugView *view, Steinberg::ViewRect *newSize) override;
 
@@ -135,8 +135,8 @@ namespace Host {
         WindowManager();
         virtual ~WindowManager() noexcept = default;
 
-        int newWindow(char *title);
-        int newWindow(char *title, int width, int height);
+        int newWindow(const std::string& title);
+        int newWindow(const std::string& title, int width, int height);
         WindowController &getWindow(int id);
         void removeWindow(int id);
         void removeAllWindows();
